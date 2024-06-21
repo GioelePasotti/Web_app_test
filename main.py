@@ -26,5 +26,5 @@ result = model.score(test_data, test_labels)
 print(result)
 
 #save the model
-filename = 'iris_model.pkl'
+filename = 'digits_model.pkl'
 pickle.dump(model, open(filename, 'wb'))
