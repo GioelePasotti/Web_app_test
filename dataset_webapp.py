@@ -9,7 +9,7 @@ from torch_geometric.data import Dataset
 from custom_featurizer import custom_featuriz
 
 print(f"Torch version: {torch.__version__}")
-print(f"Cuda available: {torch.cuda.is_available()}")
+# print(f"Cuda available: {torch.cuda.is_available()}")
 print(f"Torch geometric version: {torch_geometric.__version__}")
 
 class MoleculeDataset(Dataset):
