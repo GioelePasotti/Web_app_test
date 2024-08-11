@@ -33,9 +33,11 @@ def checkpoint(model, filename):
     torch.save(model.state_dict(), filename)
 
 
-def resume(model, filename):
-    model.load_state_dict(torch.load(filename))
+# def resume(model, filename):
+#     model.load_state_dict(torch.load(filename))
 
+def resume(model, filename):
+    model.load_state_dict(torch.load(filename, map_location=torch.device('cpu')))
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
