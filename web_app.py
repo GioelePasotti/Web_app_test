@@ -30,7 +30,8 @@ def predict_num_of_peaks(smile, mc_sam=10):
 
         params["model_edge_dim"] = dataset[0].edge_attr.shape[1]
 
-        device = "cuda" if torch.cuda.is_available else "cpu"
+        # device = "cuda" if torch.cuda.is_available else "cpu"
+        device =  "cpu"
         # model = eval(model_name)(node_feature_size=dataset[0].x.shape[1],
         #                          edge_feature_size=dataset[0].edge_attr.shape[1],
         #                          n_data_points=n_data_points, **arch_params)
