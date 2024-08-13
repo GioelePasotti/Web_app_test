@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 import streamlit as st
-
+from rdkit import Chem
 
 def predict_num_of_peaks(smile, mc_sam=10):
     model_name = "ModelPredNumPeak"
@@ -69,18 +69,24 @@ def predict_num_of_peaks(smile, mc_sam=10):
     return dtf_predictions
 
 
-# Main title and user input fields
+def is_valid_smile(smile: str) -> bool:
+    mol = Chem.MolFromSmiles(smile)
+    return mol is not None
+
+
 st.title('Prediction of number of  raman peaks starting from a SMILE')
 st.write('Enter the SMILE representation of a molecule')
 
-# User input for pixel values (8x8 image)
 smile = st.text_area('Insert SMILE')
 
 # Prediction and display result
 if st.button('Predict'):
-    prediction = predict_num_of_peaks(smile)
-    st.write(f'Predicted fingerprint region peaks: {prediction.PRED_NUM_PEAK_down.iloc[0]}')
-    st.write(f'Predicted CH region peaks: {prediction.PRED_NUM_PEAK_up.iloc[0]}')
+    if not is_valid_smile(smile):
+        st.error("Invalid SMILES string. Please enter a valid SMILES representation.")
+    else:
+        prediction = predict_num_of_peaks(smile)
+        st.write(f'Predicted fingerprint region peaks: {prediction.PRED_NUM_PEAK_down.iloc[0]}')
+        st.write(f'Predicted CH region peaks: {prediction.PRED_NUM_PEAK_up.iloc[0]}')
 
 
 # smile = 'CCO'
