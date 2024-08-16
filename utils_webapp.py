@@ -1,15 +1,14 @@
 import torch
-import pandas as pd
 import numpy as np
 import os
 import scipy
 import matplotlib.pyplot as plt
 from tenacity import retry, stop_after_attempt, wait_fixed
 import math
-import numpy
+import scipy.signal
 from numpy import dot
 from numpy.linalg import norm
-
+import streamlit as st
 
 class EarlyStopping:
 
@@ -368,3 +367,41 @@ def sim_dir(arr_true, arr_pred, conv, freq, lor_kernel):
     return sim_resc
 
 
+def plot_spectrum(pred, start, stop, marks=False, fill=True, rescale=1):
+    mycolors = ['tab:red', 'tab:blue', 'tab:green', 'tab:orange', 'tab:brown', 'tab:grey', 'tab:pink', 'tab:olive']
+    x = np.linspace(start, stop, len(pred))
+    peaks_pred, _ = scipy.signal.find_peaks(pred)
+    pred[:750] = pred[:750] * rescale
+
+    # Draw Plot
+    fig, ax = plt.subplots(1, 1, figsize=(16, 9), dpi=300)
+
+    if fill:
+        ax.fill_between(x, y1=pred, y2=0, label='Predicted Spectra', alpha=0.5, color=mycolors[0], linewidth=4 / 3.75)
+
+    # Mark peaks if `marks` is True
+    if marks:
+        ax.scatter(x[peaks_pred], pred[peaks_pred], color='red', marker='x', s=25, label='Predicted Local Maxima')
+
+    # Decorations
+    ax.set_title('Predicted Raman Spectrum', fontsize=18 / 3.75)
+    ax.set_xlabel('Raman shift ($cm^{-1}$)', fontsize=25 / 3.75)
+    ax.set_ylabel('Intensity (a.u.)', fontsize=25 / 3.75)
+    ax.legend(loc='best', fontsize=18 / 3.75)
+    ax.tick_params(axis='x', labelsize=25 / 3.75)
+    ax.tick_params(axis='y', labelsize=25 / 3.75)
+    ax.set_xlim(500, 3500)
+    ax.set_ylim(bottom=0)
+
+    # # Draw Tick lines
+    # for y in np.arange(0, max(pred), step=0.1):
+    #     ax.hlines(y, xmin=start, xmax=stop, colors='black', alpha=0.3, linestyles="--", lw=0.5)
+
+    # Lighten borders
+    ax.spines["top"].set_alpha(0)
+    ax.spines["bottom"].set_alpha(.3)
+    ax.spines["right"].set_alpha(0)
+    ax.spines["left"].set_alpha(.3)
+
+    # Show plot with Streamlit
+    st.pyplot(fig)

@@ -13,7 +13,7 @@ print(f"Torch version: {torch.__version__}")
 print(f"Torch geometric version: {torch_geometric.__version__}")
 
 class MoleculeDataset(Dataset):
-    def __init__(self, smiles, featuriz: str = 'MolGraphConv', additional_feat: bool=False):
+    def __init__(self, smiles, featuriz: str = 'MolGraphConv', additional_feat: list = None):
         self.smile = smiles
         self.featuriz = featuriz
         self.additional_features = additional_feat
@@ -30,13 +30,13 @@ class MoleculeDataset(Dataset):
         Chem.AssignStereochemistry(molecule, cleanIt=True, force=True)
         return molecule
 
-    @property
-    def raw_file_names(self):
-        return []  # No raw files
-
-    @property
-    def processed_file_names(self):
-        return []
+    # @property
+    # def raw_file_names(self):
+    #     return []  # No raw files
+    #
+    # @property
+    # def processed_file_names(self):
+    #     return []
 
     def process(self):
         featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True, use_chirality=True, use_partial_charge=True)
@@ -51,8 +51,19 @@ class MoleculeDataset(Dataset):
         data = f.to_pyg_graph()
         data.smiles = self.smile
 
+        selected_cols = self.additional_features
+        selected_values = []
+
         if self.additional_features is not None:
-            selected_values = np.array(self.additional_features, dtype=np.float64)
+            for col in self.additional_features:
+                val = self.smile[col].values
+
+                if isinstance(val[0], list):
+                    selected_values.extend(val[0])
+                else:
+                    selected_values.append(val[0])
+
+            selected_values = np.array(selected_values, dtype=np.float64)
             torch_tensor = torch.from_numpy(selected_values)
             data.graph_level_feats = torch_tensor
 
