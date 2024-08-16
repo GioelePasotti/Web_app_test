@@ -1,21 +1,39 @@
 import torch
 from dataset_webapp import MoleculeDataset
-from model_webapp import ModelPredNumPeak
+from model_webapp import ModelPredNumPeak, GINEGLOBAL
+from add_external_global_features_webapp import add_morgan_fingerprint, add_daylight_fingerprint
 from torch_geometric.loader import DataLoader
-from utils_webapp import resume, count_parameters, enable_dropout
+from utils_webapp import resume, count_parameters, enable_dropout, plot_spectrum
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import os
 import streamlit as st
 from rdkit import Chem
+import matplotlib.pyplot as plt
+from data_postprocessing import post_precessing_data
+
+def convert_df_to_csv(df):
+    return df.to_csv(index=False, sep=',').encode('utf-8')
+
+
+def plot_raman_spectrum(x, y, title='Raman Spectrum'):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(x, y, color='blue', label='Raman Spectrum')
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel('Raman Shift (cm$^{-1}$)', fontsize=12)
+    ax.set_ylabel('Intensity (a.u.)', fontsize=12)
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+
 
 def predict_num_of_peaks(smile, mc_sam=10):
     model_name = "ModelPredNumPeak"
     params = {}
     arch_params = {
-        'dim_h': 256,  # Example parameter, adjust as needed
-        'additional_feature_size': 12  # Example parameter, adjust as needed
+        'dim_h': 256,
+        'additional_feature_size': 12
     }
     n_data_points = 1
     dtf_predictions = pd.DataFrame({'smile': [smile]})
@@ -64,9 +82,86 @@ def predict_num_of_peaks(smile, mc_sam=10):
             pred = torch.mean(torch.stack(lst_pred, dim=2), dim=2)
             y_pred_batch = np.round(torch.squeeze(pred).cpu().detach().numpy())
 
-        dtf_predictions[f'PRED_NUM_PEAK_{str_dataset}'] = y_pred_batch
+        dtf_predictions[f'raman_pred_num_peak_{str_dataset}'] = y_pred_batch
 
     return dtf_predictions
+
+
+def predict_raman_spectra(smile, mc_sam=10):
+    y_pred = []
+    smiles = []
+    num_peaks = []
+
+    model_name = 'GINEGLOBAL'
+    ext_feat_up = ["raman_pred_num_peak_up", "MOLECULAR_FINGERPRINT"]
+    ext_feat_down = ["raman_pred_num_peak_down", "MOLECULAR_FINGERPRINT"]
+    params = {
+        "patience": 15,
+        "batch_size": 1,
+        "learning_rate": 0.01,
+        "weight_decay": 0.001, "sgd_momentum": 0.9,
+        "scheduler_gamma": 0.995,
+        "model_embedding_size": 256,
+        "model_attention_heads": 5,
+        "model_layers": 4,
+        "model_dropout_rate": 0.15,
+        "model_top_k_ratio": 0.75,
+        "model_top_k_every_n": 1,
+        "model_dense_neurons": 128}
+    arch_params= {
+        "dim_h": 256,
+        "additional_feature_size": 2049}
+
+    for str_dataset in ['down', 'up']:
+        y_pred = []
+
+        if str_dataset == 'down':
+            test_dataset = MoleculeDataset(smile, additional_feat=ext_feat_down)
+        else:
+            test_dataset = MoleculeDataset(smile, additional_feat=ext_feat_up)
+
+        test_loader = DataLoader(test_dataset, batch_size=params["batch_size"], shuffle=False)
+
+        n_data_points = 267
+
+        lst_file = [model for model in os.listdir(f'web_app/spectra_predictions_{str_dataset}') if model.endswith('.pth')]
+        lst_file.sort(key=lambda x: int(''.join(filter(str.isdigit, x))))
+        best_model_ckpt = lst_file[-1]
+
+        params["model_edge_dim"] = test_dataset[0].edge_attr.shape[1]
+
+        device = torch.device("cpu")
+        model = eval(model_name)(node_feature_size=test_dataset[0].x.shape[1],
+                                 edge_feature_size=test_dataset[0].edge_attr.shape[1],
+                                 n_data_points=n_data_points, **arch_params)
+        print("Number of params: ", count_parameters(model))
+        model.to(device)
+
+        resume(model, os.path.join(f'web_app/spectra_predictions_{str_dataset}', best_model_ckpt))
+        model.eval()
+        enable_dropout(model)
+
+        for batch in tqdm(test_loader):
+            lst_pred = []
+            batch.to(device)
+
+            for i in range(mc_sam):
+                pred = model(batch.x.float(),
+                             batch.graph_level_feats,
+                             batch.edge_attr.float(),
+                             batch.edge_index,
+                             batch.batch)
+                lst_pred.append(pred)
+
+            pred = torch.mean(torch.stack(lst_pred, dim=2), dim=2)
+            y_pred_batch = torch.squeeze(pred).cpu().detach().numpy()
+
+            y_pred.extend(y_pred_batch)
+            num_peaks.extend(batch.graph_level_feats.reshape(len(batch.smiles), -1)[:, 0].cpu().detach().numpy().tolist())
+            smiles.extend(batch.smiles)
+
+        smile[f'raman_pred_{str_dataset}'] = [y_pred]
+    return smile
 
 
 def is_valid_smile(smile: str) -> bool:
@@ -84,11 +179,28 @@ if st.button('Predict'):
     if not is_valid_smile(smile):
         st.error("Invalid SMILES string. Please enter a valid SMILES representation.")
     else:
-        prediction = predict_num_of_peaks(smile)
-        st.write(f'Predicted fingerprint region peaks: {prediction.PRED_NUM_PEAK_down.iloc[0]}')
-        st.write(f'Predicted CH region peaks: {prediction.PRED_NUM_PEAK_up.iloc[0]}')
+        dtf_number_of_peaks = predict_num_of_peaks(smile)
+        dtf_prediction = add_morgan_fingerprint(dtf_number_of_peaks)
+        dtf_prediction = add_daylight_fingerprint(dtf_prediction)
+        dtf_raman_spectra = predict_raman_spectra(dtf_prediction)
 
+        dtf_prediction = post_precessing_data(dtf_raman_spectra)
 
-# smile = 'CCO'
-# pred = predict_num_of_peaks(smile)
-# print(pred)
+        # Convert DataFrame to CSV
+        csv_data = convert_df_to_csv(dtf_prediction)
+
+        # Plot the Raman Spectra
+        raman_spectra = dtf_prediction['raman_pred'].iloc[0]
+        len_sp = len(dtf_prediction['raman_pred'].iloc[0])
+        x = np.linspace(500, 3500, len_sp)
+        plot_spectrum(raman_spectra, 500, 3500, rescale=3)
+
+        # Download button
+        st.download_button(
+            label="Download data as CSV",
+            data=csv_data,
+            file_name='raman_spectrum.csv',
+            mime='text/csv',
+        )
+        # st.write(f'Predicted fingerprint region peaks: {dtf_prediction.PRED_NUM_PEAK_down.iloc[0]}')
+        # st.write(f'Predicted CH region peaks: {dtf_prediction.PRED_NUM_PEAK_up.iloc[0]}')
