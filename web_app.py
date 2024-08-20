@@ -180,27 +180,27 @@ if st.button('Predict'):
         st.error("Invalid SMILES string. Please enter a valid SMILES representation.")
     else:
         dtf_number_of_peaks = predict_num_of_peaks(smile)
-        dtf_prediction = add_morgan_fingerprint(dtf_number_of_peaks)
-        dtf_prediction = add_daylight_fingerprint(dtf_prediction)
-        dtf_raman_spectra = predict_raman_spectra(dtf_prediction)
-
-        dtf_prediction = post_precessing_data(dtf_raman_spectra)
-
-        # Convert DataFrame to CSV
-        csv_data = convert_df_to_csv(dtf_prediction)
-
-        # Plot the Raman Spectra
-        raman_spectra = dtf_prediction['raman_pred'].iloc[0]
-        len_sp = len(dtf_prediction['raman_pred'].iloc[0])
-        x = np.linspace(500, 3500, len_sp)
-        plot_spectrum(raman_spectra, 500, 3500, rescale=3)
+        # dtf_prediction = add_morgan_fingerprint(dtf_number_of_peaks)
+        # dtf_prediction = add_daylight_fingerprint(dtf_prediction)
+        # dtf_raman_spectra = predict_raman_spectra(dtf_prediction)
+        #
+        # dtf_prediction = post_precessing_data(dtf_raman_spectra)
+        #
+        # # Convert DataFrame to CSV
+        # csv_data = convert_df_to_csv(dtf_prediction)
+        #
+        # # Plot the Raman Spectra
+        # raman_spectra = dtf_prediction['raman_pred'].iloc[0]
+        # len_sp = len(dtf_prediction['raman_pred'].iloc[0])
+        # x = np.linspace(500, 3500, len_sp)
+        # plot_spectrum(raman_spectra, 500, 3500, rescale=3)
 
         # Download button
-        st.download_button(
-            label="Download data as CSV",
-            data=csv_data,
-            file_name='raman_spectrum.csv',
-            mime='text/csv',
-        )
-        # st.write(f'Predicted fingerprint region peaks: {dtf_prediction.PRED_NUM_PEAK_down.iloc[0]}')
-        # st.write(f'Predicted CH region peaks: {dtf_prediction.PRED_NUM_PEAK_up.iloc[0]}')
+        # st.download_button(
+        #     label="Download data as CSV",
+        #     data=csv_data,
+        #     file_name='raman_spectrum.csv',
+        #     mime='text/csv',
+        # )
+        st.write(f'Predicted fingerprint region peaks: {dtf_number_of_peaks.PRED_NUM_PEAK_down.iloc[0]}')
+        st.write(f'Predicted CH region peaks: {dtf_number_of_peaks.PRED_NUM_PEAK_up.iloc[0]}')
