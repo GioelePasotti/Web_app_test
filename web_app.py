@@ -12,6 +12,8 @@ import streamlit as st
 from rdkit import Chem
 import matplotlib.pyplot as plt
 from data_postprocessing import post_precessing_data
+from google_drive import get_model_from_drive
+
 
 def convert_df_to_csv(df):
     return df.to_csv(index=False, sep=',').encode('utf-8')
@@ -88,6 +90,8 @@ def predict_num_of_peaks(smile, mc_sam=10):
 
 
 def predict_raman_spectra(smile, mc_sam=10):
+    drive_file_id_up = '1DgoulgBzQZE_FG-qYJ2Cn8Arznh2yTQo'
+    drive_file_id_down = '1auEXPQo133aL1hSAArKQb7WC7vEcm0uQ'
     y_pred = []
     smiles = []
     num_peaks = []
@@ -117,16 +121,18 @@ def predict_raman_spectra(smile, mc_sam=10):
 
         if str_dataset == 'down':
             test_dataset = MoleculeDataset(smile, additional_feat=ext_feat_down)
+            best_model_ckpt = get_model_from_drive(drive_file_id_down)
         else:
             test_dataset = MoleculeDataset(smile, additional_feat=ext_feat_up)
+            best_model_ckpt = get_model_from_drive(drive_file_id_up)
 
         test_loader = DataLoader(test_dataset, batch_size=params["batch_size"], shuffle=False)
 
         n_data_points = 267
 
-        lst_file = [model for model in os.listdir(f'web_app/spectra_predictions_{str_dataset}') if model.endswith('.pth')]
-        lst_file.sort(key=lambda x: int(''.join(filter(str.isdigit, x))))
-        best_model_ckpt = lst_file[-1]
+        # lst_file = [model for model in os.listdir(f'web_app/spectra_predictions_{str_dataset}') if model.endswith('.pth')]
+        # lst_file.sort(key=lambda x: int(''.join(filter(str.isdigit, x))))
+        # best_model_ckpt = lst_file[-1]
 
         params["model_edge_dim"] = test_dataset[0].edge_attr.shape[1]
 
@@ -137,7 +143,8 @@ def predict_raman_spectra(smile, mc_sam=10):
         print("Number of params: ", count_parameters(model))
         model.to(device)
 
-        resume(model, os.path.join(f'web_app/spectra_predictions_{str_dataset}', best_model_ckpt))
+        # resume(model, os.path.join(f'web_app/spectra_predictions_{str_dataset}', best_model_ckpt))
+        model.load_state_dict(torch.load(best_model_ckpt, map_location=torch.device('cpu')))
         model.eval()
         enable_dropout(model)
 
@@ -180,27 +187,28 @@ if st.button('Predict'):
         st.error("Invalid SMILES string. Please enter a valid SMILES representation.")
     else:
         dtf_number_of_peaks = predict_num_of_peaks(smile)
-        # dtf_prediction = add_morgan_fingerprint(dtf_number_of_peaks)
-        # dtf_prediction = add_daylight_fingerprint(dtf_prediction)
-        # dtf_raman_spectra = predict_raman_spectra(dtf_prediction)
-        #
-        # dtf_prediction = post_precessing_data(dtf_raman_spectra)
-        #
-        # # Convert DataFrame to CSV
-        # csv_data = convert_df_to_csv(dtf_prediction)
-        #
-        # # Plot the Raman Spectra
-        # raman_spectra = dtf_prediction['raman_pred'].iloc[0]
-        # len_sp = len(dtf_prediction['raman_pred'].iloc[0])
-        # x = np.linspace(500, 3500, len_sp)
-        # plot_spectrum(raman_spectra, 500, 3500, rescale=3)
+        dtf_prediction = add_morgan_fingerprint(dtf_number_of_peaks)
+        dtf_prediction = add_daylight_fingerprint(dtf_prediction)
+        dtf_raman_spectra = predict_raman_spectra(dtf_prediction)
+
+        dtf_prediction = post_precessing_data(dtf_raman_spectra)
+
+        # Convert DataFrame to CSV
+        csv_data = convert_df_to_csv(dtf_prediction)
+
+        # Plot the Raman Spectra
+        raman_spectra = dtf_prediction['raman_pred'].iloc[0]
+        len_sp = len(dtf_prediction['raman_pred'].iloc[0])
+        x = np.linspace(500, 3500, len_sp)
+        plot_spectrum(raman_spectra, 500, 3500, rescale=3)
 
         # Download button
-        # st.download_button(
-        #     label="Download data as CSV",
-        #     data=csv_data,
-        #     file_name='raman_spectrum.csv',
-        #     mime='text/csv',
-        # )
-        st.write(f'Predicted fingerprint region peaks: {dtf_number_of_peaks.raman_pred_num_peak_down.iloc[0]}')
-        st.write(f'Predicted CH region peaks: {dtf_number_of_peaks.raman_pred_num_peak_up.iloc[0]}')
+        st.download_button(
+            label="Download data as CSV",
+            data=csv_data,
+            file_name='raman_spectrum.csv',
+            mime='text/csv',
+        )
+
+        # st.write(f'Predicted fingerprint region peaks: {dtf_number_of_peaks.raman_pred_num_peak_down.iloc[0]}')
+        # st.write(f'Predicted CH region peaks: {dtf_number_of_peaks.raman_pred_num_peak_up.iloc[0]}')
