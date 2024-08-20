@@ -202,5 +202,5 @@ if st.button('Predict'):
         #     file_name='raman_spectrum.csv',
         #     mime='text/csv',
         # )
-        st.write(f'Predicted fingerprint region peaks: {dtf_number_of_peaks.PRED_NUM_PEAK_down.iloc[0]}')
-        st.write(f'Predicted CH region peaks: {dtf_number_of_peaks.PRED_NUM_PEAK_up.iloc[0]}')
+        st.write(f'Predicted fingerprint region peaks: {dtf_number_of_peaks.raman_pred_num_peak_down.iloc[0]}')
+        st.write(f'Predicted CH region peaks: {dtf_number_of_peaks.raman_pred_num_peak_up.iloc[0]}')
